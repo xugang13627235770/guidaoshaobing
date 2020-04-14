@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title></title>
+</head>
+<body>
+
+<button id="butten1" style="width:200px;height:30px;margin-bottom: 20px;">通过注解方式调用安卓扫码</button>
+<br/>
+<a href="doscan:androidscan" ><input type="button" value="通过url拦截方式调用安卓扫码" style="width:200px;height:30px;"/></a>
+<br/>
+<div id="text"></div>
+</body>
+
+<script type="text/javascript">
+    document.getElementById("butten1").onclick = function(){
+        <!--调用安卓原生方法-->
+        android.doScan();
+    };
+
+    var text = document.getElementById("text");
+    <!--安卓调用js有参方法,参数就是扫码结果-->
+    function setScanResult(result){
+        text.innerHTML = "扫码结果:"+result;
+    };
+
+</script>
+</html>
