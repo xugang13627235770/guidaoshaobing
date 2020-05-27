@@ -9,45 +9,40 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.net.Uri;
-import android.nfc.NfcAdapter;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Parcelable;
 import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.text.Html;
-import android.util.Log;
+import android.view.KeyEvent;
 import android.webkit.*;
 import android.widget.Toast;
-import cn.com.cybertech.pdk.UserInfo;
-import com.citms.gdsb.card.CardManager;
-import com.citms.gdsb.card.pboc.PbocCard;
+import com.citms.gdsb.aes.AESUtils;
+import com.citms.gdsb.nfc.BaseNfcActivity;
 import com.citms.gdsb.utils.CheckPermissionUtils;
 import com.citms.gdsb.utils.Constant;
 import com.uuzuche.lib_zxing.activity.CaptureActivity;
 import com.uuzuche.lib_zxing.activity.CodeUtils;
-import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Map;
 
-public class MyWebViewActivity extends AppCompatActivity {
+public class MyWebViewActivity extends BaseNfcActivity {
 
-    private final static int                  FILE_CHOOSER_RESULT_CODE = 10000;
-    private final static int                  SCAN_CHOOSER_RESULT_CODE = 20000;
-//    public static final String DEFAULT_URL = "http://192.168.20.72:40046/index.html?v=";
-    public static final String               DEFAULT_URL              = "http://192.168.77.169:8081/index.html?v=";
+    private final static int    FILE_CHOOSER_RESULT_CODE = 10000;
+    private final static int    SCAN_CHOOSER_RESULT_CODE = 20000;
+    private final static String    AES_KEY = "b13df01d7efd4d4d";//aes加密的key
+    //    public static final String DEFAULT_URL = "http://192.168.20.72:40046/index.html?v=";//现场
+        public static final String               DEFAULT_URL              = "http://192.168.7.18:8080/index.html?v=";
+//    public static final  String DEFAULT_URL              = "http://192.168.77.169:8080/index.html?v=";
 
-    private              ValueCallback<Uri>   uploadMessage;
-    private              ValueCallback<Uri[]> uploadMessageAboveL;
-    private              WebView              webview;
-    private              NfcAdapter           nfcAdapter;
-    private              PendingIntent        pendingIntent;
+    private ValueCallback<Uri>   uploadMessage;
+    private ValueCallback<Uri[]> uploadMessageAboveL;
+    private WebView              webview;
+    private PendingIntent        pendingIntent;
+    private long exitTime;//返回键退出时间
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -94,10 +89,6 @@ public class MyWebViewActivity extends AppCompatActivity {
         webview.addJavascriptInterface(this, "android");//"android" 和h5要一致
         webview.loadUrl(DEFAULT_URL + System.currentTimeMillis());
 
-        //NFC功能初始化
-        nfcAdapter = NfcAdapter.getDefaultAdapter(this);
-        pendingIntent = PendingIntent.getActivity(this, 0, new Intent(this,
-                getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), 0);
     }
 
     // 2.回调方法触发本地选择文件
@@ -143,7 +134,7 @@ public class MyWebViewActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == FILE_CHOOSER_RESULT_CODE) {
+        if (data != null && requestCode == FILE_CHOOSER_RESULT_CODE) {
             if (data.getAction() != null) {//调用照相机
                 String filepath = processFile(data);
                 Uri[] results = new Uri[] { Uri.fromFile(new File(filepath)) };
@@ -152,7 +143,7 @@ public class MyWebViewActivity extends AppCompatActivity {
             } else {//调用图库
                 onActivityResultAboveL(requestCode, resultCode, data);
             }
-        } else if (requestCode == SCAN_CHOOSER_RESULT_CODE) {
+        } else if (data != null && requestCode == SCAN_CHOOSER_RESULT_CODE) {
             Bundle bundle = data.getExtras();
             if (bundle == null) {
                 return;
@@ -178,7 +169,8 @@ public class MyWebViewActivity extends AppCompatActivity {
         Bitmap bi = (Bitmap) data.getExtras().get("data");
         //将图片保存到SD卡中
         FileOutputStream b = null;
-        File file = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + Constant.PATH);
+        File file = new File(
+                Environment.getExternalStorageDirectory().getAbsolutePath() + Constant.PATH);
         //判断文件是否存在
         if (!file.exists()) {
             file.mkdirs();// 创建文件夹
@@ -236,31 +228,31 @@ public class MyWebViewActivity extends AppCompatActivity {
 
     }
 
-//    /**
-//     * 集成APP时，获取用户信息时调用
-//     */
-//    @JavascriptInterface
-//    public void initUserInfo() {
-//        runOnUiThread(new Runnable() {
-//            @Override
-//            public void run() {
-//                try {
-//                    Map<String, String> map = UserInfo.getUserInfo(MyWebViewActivity.this);
-//                    String result = "";
-//                    if (map != null) {
-//                        JSONObject object = new JSONObject(map);
-//                        result = object.toString();
-//                    } else {
-//                        result = "map is null";
-//                    }
-//                    webview.loadUrl("javascript:setUserInfo('" + result + "')");
-//                } catch (Exception e) {
-//                    webview.loadUrl("javascript:setUserInfo('" + e.getMessage() + "')");
-//                }
-//
-//            }
-//        });
-//    }
+    //    /**
+    //     * 集成APP时，获取用户信息时调用
+    //     */
+    //    @JavascriptInterface
+    //    public void initUserInfo() {
+    //        runOnUiThread(new Runnable() {
+    //            @Override
+    //            public void run() {
+    //                try {
+    //                    Map<String, String> map = UserInfo.getUserInfo(MyWebViewActivity.this);
+    //                    String result = "";
+    //                    if (map != null) {
+    //                        JSONObject object = new JSONObject(map);
+    //                        result = object.toString();
+    //                    } else {
+    //                        result = "map is null";
+    //                    }
+    //                    webview.loadUrl("javascript:setUserInfo('" + result + "')");
+    //                } catch (Exception e) {
+    //                    webview.loadUrl("javascript:setUserInfo('" + e.getMessage() + "')");
+    //                }
+    //
+    //            }
+    //        });
+    //    }
 
     /**
      * 传入userId并将userId保存到本地
@@ -268,7 +260,8 @@ public class MyWebViewActivity extends AppCompatActivity {
     @JavascriptInterface
     public void saveUserIdByPhone(Long userId) {
         //步骤1：创建一个SharedPreferences对象
-        SharedPreferences sharedPreferences= getSharedPreferences(Constant.PREFERENCE_NAME,Context.MODE_PRIVATE);
+        SharedPreferences sharedPreferences = getSharedPreferences(Constant.PREFERENCE_NAME,
+                Context.MODE_PRIVATE);
         //步骤2： 实例化SharedPreferences.Editor对象
         SharedPreferences.Editor editor = sharedPreferences.edit();
         //步骤3：将获取过来的值放入文件
@@ -292,45 +285,51 @@ public class MyWebViewActivity extends AppCompatActivity {
         }
     }
 
-    /*
-    NFC功能
+    /**
+     * NFC读取标签
+     * @param intent
      */
     @Override
-    protected void onPause() {
-        super.onPause();
-
-        if (nfcAdapter != null)
-            nfcAdapter.disableForegroundDispatch(this);
+    public void onNewIntent(Intent intent) {
+        String aesTag = readNfcTag(intent);
+        String nfcTag = AESUtils.decryptData(AES_KEY, aesTag);
+//        Toast.makeText(this,nfcTag,Toast.LENGTH_LONG).show();
+        webview.loadUrl("javascript:processNfcCard('" + nfcTag + "')");
     }
 
+    /**
+     * 监听返回键
+     */
     @Override
-    protected void onResume() {
-        super.onResume();
-
-        if (nfcAdapter != null)
-            nfcAdapter.enableForegroundDispatch(this, pendingIntent,
-                    CardManager.FILTERS, CardManager.TECHLISTS);
-
-    }
-
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-
-        final Parcelable p = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
-        Log.d("NFCTAG", intent.getAction());
-        showData((p != null) ? CardManager.load(p, getResources()) : null);
-    }
-
-    private void showData(String data) {
-
-        if (data == null || data.length() == 0) {
-            Toast.makeText(this,"读取不到信息",Toast.LENGTH_LONG).show();
-            return;
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if(keyCode == KeyEvent.KEYCODE_BACK){
+            String originalUrl = webview.getUrl();
+            if(originalUrl.lastIndexOf("#/attendance") == originalUrl.length()-12
+               || originalUrl.lastIndexOf("#/case") == originalUrl.length()-6
+               || originalUrl.lastIndexOf("#/task") == originalUrl.length()-6){
+                webview.loadUrl("javascript:backHome()");
+            }
+            else if(originalUrl.lastIndexOf("#/nav") == originalUrl.length()-5
+                || originalUrl.lastIndexOf("#/") == originalUrl.length()-2){
+                exitApp();
+            }else if(webview.canGoBack()){
+                webview.goBack();
+            }
         }
-
-//        PbocCard.getSerl();
-        Toast.makeText(this,Html.fromHtml(data),Toast.LENGTH_LONG).show();
+       return false;
     }
 
+    /**
+     * 退出app处理
+     */
+    private void exitApp() {
+        if ((System.currentTimeMillis() - exitTime)> 2000) { //System.currentTimeMillis()无论何时调用，肯定大于2000
+            exitTime = System.currentTimeMillis();
+            Toast.makeText(this, "请再按一次退出程序", Toast.LENGTH_SHORT).show();
+        } else {
+            //退出应用
+            finish();
+            System.exit(0);
+        }
+    }
 }
